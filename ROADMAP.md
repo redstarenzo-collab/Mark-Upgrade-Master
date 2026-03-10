@@ -110,7 +110,7 @@ Modelo recomendado:
 ## Fase 3 - UX e Identidade Visual (3-5 dias)
 **Meta:** elevar percepcao de produto e clareza de estados.
 
-**Status:** Em andamento (inicio em 2026-03-10 13:58:28)
+**Status:** Em andamento com regressao funcional em placeholder/target (revisao critica aberta em 2026-03-10 16:03:31)
 
 ### Tarefas
 - [x] Intro de abertura com personagem Mark.
@@ -121,14 +121,20 @@ Modelo recomendado:
   - [x] sem fundo e menor tamanho
 - [x] Inserir logo na interface (identidade MARK no header).
 - [x] Melhorar dark mode (incluindo barras de rolagem escuras).
+- [x] Melhorar overlay de gravacao (contraste alto, painel sempre visivel).
+- [x] Feedback visual de alvo/placeholder (pulse e marcador na tela).
+- [x] Ferramenta `Move Target` com pausa automatica da gravacao.
+- [ ] Revisar e estabilizar fluxo de placeholders/target (bug atual em selecao/captura em qualquer area).
 - [ ] Completar traducao (menus superiores, secoes e mensagens faltantes).
 
 ### Entregaveis
 - UI com feedback visual de status.
 - Visual consistente em claro/escuro.
+- Fluxo de placeholder/target estavel e previsivel em campos de texto e clique geral.
 
 ### Criterio de pronto
 - Usuario entende estado da automacao sem depender apenas de logs.
+- Usuario consegue definir/mover target e inserir placeholders CSV sem falhas de captura.
 
 ## Fase 4 - Produto Mais Completo (continuo)
 **Meta:** qualidade para distribuicao e escala.
@@ -162,12 +168,32 @@ Modelo recomendado:
 - [x] CSV/header corrigido
 - [x] Clear total
 - [x] Persistencia JSON
+- [ ] Revisao critica placeholder/target (captura e aplicacao)
 
 ### Next
 - [x] Undo/redo robusto
 - [x] Parser de preview resiliente
 - [ ] Traducao completa
 - [ ] Correcao dark mode (scrollbars)
+- [ ] Validacao guiada do fluxo CSV end-to-end (importar, ancorar placeholder, replay com preenchimento)
+
+## 11) Revisao Critica Aberta - Placeholder/Target
+**Aberta em:** 2026-03-10 16:03:31
+
+### Problemas reportados
+- Placeholder registrado no node, mas comportamento inconsistente no preenchimento durante execucao.
+- Captura de target nao confiavel em "qualquer ponto da tela".
+- `Move Target` com experiencia lenta/instavel em alguns contextos.
+
+### Plano de correcao
+- Revisar fluxo de captura de mouse com telemetria de eventos (click/move ignorado/aceito).
+- Definir criterio unico de "area ignorada" (somente overlays da ferramenta).
+- Garantir update imediato de coordenadas em qualquer clique valido.
+- Validar comportamento especifico em campos de texto (cursor I-beam).
+- Fechar com checklist manual: import CSV -> selecionar target -> placeholder -> replay preenchendo colunas.
+
+### Criterio de fechamento
+- 100% dos testes manuais do fluxo CSV/placeholder/target passam sem regressao.
 
 ### Later
 - [ ] Intro + animacoes do Mark
@@ -238,6 +264,8 @@ O MVP sera considerado pronto quando:
 - 2026-03-10 13:41:59 - Fase 1 concluida (gravacao click/press/scroll, replay com pausa/parada, clear completo, CSV/header corrigido, delay conectado ao seletor).
 - 2026-03-10 13:52:51 - Fase 2 concluida tecnicamente (salvar/carregar JSON, parser resiliente no preview, undo/redo com snapshot consistente, mensagens de erro aprimoradas).
 - 2026-03-10 13:58:28 - Fase 3 iniciada com identidade visual MARK (intro, status chip, painel de sinal, cubo holografico animado, tema dark/light refinado).
+- 2026-03-10 14:00-16:00 - Iteracoes de UX/controle: overlay de gravacao destacado, integracao de placeholders CSV no painel, pulse visual de target/placeholder, modo `Move Target`, ajustes de status `IDLE` e iconografia no header.
+- 2026-03-10 16:03:31 - Aberta revisao critica de placeholder/target por inconsistencias no fluxo real de captura/preenchimento.
 
 ---
-Ultima atualizacao: 2026-03-10 13:58:28
+Ultima atualizacao: 2026-03-10 16:03:31

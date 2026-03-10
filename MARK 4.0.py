@@ -10,7 +10,7 @@ from typing import Any, List, Optional
 import pandas as pd
 import pyautogui
 from PyQt5.QtCore import QPoint, Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QIcon, QColor, QPainter, QPen, QLinearGradient
+from PyQt5.QtGui import QFont, QIcon, QColor, QPainter, QPen, QLinearGradient, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -109,6 +109,8 @@ class RecordingOverlay(QWidget):
     start_record_signal = pyqtSignal()
     pause_resume_record_signal = pyqtSignal()
     stop_record_signal = pyqtSignal()
+    add_csv_placeholder_signal = pyqtSignal(str)
+    move_target_signal = pyqtSignal()
 
     def __init__(self, parent: Optional[QWidget] = None):
         # Keep overlay as a top-level tool window so it stays visible even when main window is minimized.
@@ -117,17 +119,29 @@ class RecordingOverlay(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Recording Overlay")
-        self.setGeometry(0, 0, 260, 110)
+        self.setGeometry(0, 0, 360, 180)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         layout = QVBoxLayout()
         self.setLayout(layout)
-        self.setStyleSheet("background:rgba(0, 0, 0, 160); color:white; font-size:14px;")
+        self.setStyleSheet(
+            """
+            background: rgba(8, 14, 18, 235);
+            color: #f2f6f8;
+            font-size: 14px;
+            border: 2px solid #8fd3ff;
+            border-radius: 12px;
+            """
+        )
 
         self.label = QLabel('Recording... Press "Stop" to finish.')
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label)
+
+        self.placeholder_status = QLabel("Tip: click target field, then add placeholder")
+        self.placeholder_status.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.placeholder_status)
 
         controls = QHBoxLayout()
         layout.addLayout(controls)
@@ -143,6 +157,37 @@ class RecordingOverlay(QWidget):
         stop_button = QPushButton("Stop")
         stop_button.clicked.connect(self.stop_record_signal.emit)
         controls.addWidget(stop_button)
+
+        csv_controls = QHBoxLayout()
+        layout.addLayout(csv_controls)
+
+        self.csv_placeholder_combo = QComboBox()
+        self.csv_placeholder_combo.setPlaceholderText("CSV Column")
+        csv_controls.addWidget(self.csv_placeholder_combo)
+
+        self.add_csv_placeholder_button = QPushButton("Add Placeholder")
+        self.add_csv_placeholder_button.clicked.connect(self.emit_csv_placeholder)
+        csv_controls.addWidget(self.add_csv_placeholder_button)
+
+        target_controls = QHBoxLayout()
+        layout.addLayout(target_controls)
+
+        self.move_target_button = QPushButton("Move Target")
+        self.move_target_button.clicked.connect(self.move_target_signal.emit)
+        target_controls.addWidget(self.move_target_button)
+
+    def set_csv_columns(self, columns: List[str]):
+        self.csv_placeholder_combo.clear()
+        self.csv_placeholder_combo.addItems(columns)
+        self.add_csv_placeholder_button.setEnabled(bool(columns))
+
+    def emit_csv_placeholder(self):
+        selected = self.csv_placeholder_combo.currentText().strip()
+        if selected:
+            self.add_csv_placeholder_signal.emit(selected)
+
+    def set_placeholder_status(self, text: str):
+        self.placeholder_status.setText(text)
 
 
 class MarkIntroDialog(QDialog):
@@ -279,6 +324,107 @@ class MarkHoloCubeWidget(QWidget):
         painter.drawEllipse(int(cx - size * 1.3), int(cy - size * 1.3), int(size * 2.6), int(size * 2.6))
 
 
+class PlaceholderPulseOverlay(QWidget):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(None)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.center = QPoint(0, 0)
+        self.radius = 10
+        self.max_radius = 54
+        self.steps_left = 0
+        self.color = QColor("#79f0b2")
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.tick)
+
+    def flash(self, global_x: int, global_y: int, color: QColor):
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+
+        self.setGeometry(screen.geometry())
+        self.center = QPoint(global_x - self.geometry().x(), global_y - self.geometry().y())
+        self.radius = 10
+        self.steps_left = 12
+        self.color = color
+        self.show()
+        self.raise_()
+        self.timer.start(30)
+
+    def tick(self):
+        self.radius += 4
+        self.steps_left -= 1
+        if self.steps_left <= 0 or self.radius > self.max_radius:
+            self.timer.stop()
+            self.hide()
+        self.update()
+
+    def paintEvent(self, event):
+        del event
+        if not self.isVisible():
+            return
+
+        alpha = max(0, 230 - self.radius * 3)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        pen = QPen(QColor(self.color.red(), self.color.green(), self.color.blue(), alpha), 3)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(self.center, self.radius, self.radius)
+
+        center_pen = QPen(QColor(self.color.red(), self.color.green(), self.color.blue(), min(255, alpha + 30)), 2)
+        painter.setPen(center_pen)
+        painter.drawEllipse(self.center, 6, 6)
+
+
+class TargetMarkerOverlay(QWidget):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(None)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.center = QPoint(0, 0)
+        self.marker_color = QColor("#ff9a6b")
+
+    def show_at(self, global_x: int, global_y: int, color: QColor):
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+
+        if self.geometry() != screen.geometry():
+            self.setGeometry(screen.geometry())
+        self.center = QPoint(global_x - self.geometry().x(), global_y - self.geometry().y())
+        self.marker_color = color
+        if not self.isVisible():
+            self.show()
+            self.raise_()
+        self.update()
+
+    def hide_marker(self):
+        self.hide()
+
+    def paintEvent(self, event):
+        del event
+        if not self.isVisible():
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        outer_pen = QPen(self.marker_color, 3)
+        painter.setPen(outer_pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(self.center, 20, 20)
+
+        cross_pen = QPen(QColor(self.marker_color.red(), self.marker_color.green(), self.marker_color.blue(), 220), 2)
+        painter.setPen(cross_pen)
+        painter.drawLine(self.center.x() - 10, self.center.y(), self.center.x() + 10, self.center.y())
+        painter.drawLine(self.center.x(), self.center.y() - 10, self.center.x(), self.center.y() + 10)
+
+
 class ActionRecorder(QMainWindow):
     update_preview_signal = pyqtSignal()
 
@@ -312,6 +458,13 @@ class ActionRecorder(QMainWindow):
         self.tabela: Optional[pd.DataFrame] = None
         self.csv_filename: Optional[str] = None
         self.time_sleep_value = 0.25
+        self.mark_idle_icon_path = os.path.join(os.path.dirname(__file__), "m_icon.png")
+        self.last_record_click_position: Optional[tuple] = None
+        self.placeholder_pulse_overlay = PlaceholderPulseOverlay()
+        self.target_marker_overlay = TargetMarkerOverlay()
+        self.move_target_mode = False
+        self.was_paused_before_move = False
+        self.last_move_preview_ts = 0.0
 
         self.init_ui()
         self.update_ui_texts()
@@ -337,17 +490,30 @@ class ActionRecorder(QMainWindow):
         header_layout.setContentsMargins(14, 10, 14, 10)
 
         title_box = QVBoxLayout()
+        title_row = QHBoxLayout()
+        self.mark_title_icon = QLabel()
+        title_icon = QPixmap(self.mark_idle_icon_path)
+        if not title_icon.isNull():
+            self.mark_title_icon.setPixmap(title_icon.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.mark_title_icon.setFixedSize(34, 34)
+        self.mark_title_icon.setAlignment(Qt.AlignCenter)
+
         self.mark_title = QLabel("MARK")
         self.mark_title.setObjectName("markTitle")
+        title_row.addWidget(self.mark_title_icon)
+        title_row.addWidget(self.mark_title)
+        title_row.addStretch()
+
         self.mark_subtitle = QLabel("Tranquility Base Operations")
         self.mark_subtitle.setObjectName("markSubtitle")
-        title_box.addWidget(self.mark_title)
+        title_box.addLayout(title_row)
         title_box.addWidget(self.mark_subtitle)
 
-        self.mark_status_chip = QLabel("IDLE")
+        self.mark_status_chip = QLabel()
         self.mark_status_chip.setObjectName("markStatusChip")
         self.mark_status_chip.setAlignment(Qt.AlignCenter)
         self.mark_status_chip.setMinimumWidth(140)
+        self.mark_status_chip.setMinimumHeight(86)
 
         header_layout.addLayout(title_box)
         header_layout.addStretch()
@@ -509,6 +675,8 @@ class ActionRecorder(QMainWindow):
         self.overlay.start_record_signal.connect(self.start_record)
         self.overlay.pause_resume_record_signal.connect(self.pause_resume_record)
         self.overlay.stop_record_signal.connect(self.stop_record)
+        self.overlay.add_csv_placeholder_signal.connect(self.add_csv_placeholder_action)
+        self.overlay.move_target_signal.connect(self.toggle_move_target_mode)
         self.apply_mark_state("idle")
 
     def load_translation(self, language_code: str):
@@ -536,33 +704,39 @@ class ActionRecorder(QMainWindow):
     def apply_mark_state(self, state: str):
         self.mark_state = state
         if state == "recording":
+            self.mark_status_chip.setPixmap(QPixmap())
             self.mark_status_chip.setText("RECORDING")
             self.mark_status_chip.setStyleSheet("background:#7dc8ae; color:#11211b; border-radius:12px; padding:6px 12px; font-weight:700;")
             self.mark_quote_label.setText("Recording in progress. Please hold your position.")
             self.mark_holo_cube.set_state(True, False)
         elif state == "record_paused":
+            self.mark_status_chip.setPixmap(QPixmap())
             self.mark_status_chip.setText("REC PAUSED")
             self.mark_status_chip.setStyleSheet("background:#dcc39a; color:#292014; border-radius:12px; padding:6px 12px; font-weight:700;")
             self.mark_quote_label.setText("Recording paused. Mark is standing by.")
             self.mark_holo_cube.set_state(True, True)
         elif state == "replaying":
+            self.mark_status_chip.setPixmap(QPixmap())
             self.mark_status_chip.setText("EXECUTING")
             self.mark_status_chip.setStyleSheet("background:#88d0ba; color:#11211b; border-radius:12px; padding:6px 12px; font-weight:700;")
             self.mark_quote_label.setText("Workflow executing. Keep this channel clear.")
             self.mark_holo_cube.set_state(True, False)
         elif state == "replay_paused":
+            self.mark_status_chip.setPixmap(QPixmap())
             self.mark_status_chip.setText("EXEC PAUSED")
             self.mark_status_chip.setStyleSheet("background:#d3b686; color:#2a2216; border-radius:12px; padding:6px 12px; font-weight:700;")
             self.mark_quote_label.setText("Execution paused. Awaiting your command.")
             self.mark_holo_cube.set_state(True, True)
         elif state == "editing":
+            self.mark_status_chip.setPixmap(QPixmap())
             self.mark_status_chip.setText("EDITING")
             self.mark_status_chip.setStyleSheet("background:#9db0a8; color:#1c2823; border-radius:12px; padding:6px 12px; font-weight:700;")
             self.mark_quote_label.setText("Editing timeline. Confirm each line before dispatch.")
             self.mark_holo_cube.set_state(False, False)
         else:
+            self.mark_status_chip.setStyleSheet("background:#8a968f; color:#16211d; border-radius:12px; padding:4px;")
+            self.mark_status_chip.setPixmap(QPixmap())
             self.mark_status_chip.setText("IDLE")
-            self.mark_status_chip.setStyleSheet("background:#8a968f; color:#16211d; border-radius:12px; padding:6px 12px; font-weight:700;")
             self.mark_quote_label.setText("Good afternoon. Mark speaking. How may I direct your call?")
             self.mark_holo_cube.set_state(False, False)
 
@@ -701,11 +875,17 @@ class ActionRecorder(QMainWindow):
         self.recording = True
         self.record_paused = False
         self.current_actions = []
+        self.last_record_click_position = None
+        self.move_target_mode = False
 
-        self.mouse_listener = MouseListener(on_click=self.on_click, on_scroll=self.on_scroll)
+        self.mouse_listener = MouseListener(on_click=self.on_click, on_scroll=self.on_scroll, on_move=self.on_move)
         self.keyboard_listener = KeyboardListener(on_press=self.on_press)
         self.mouse_listener.start()
         self.keyboard_listener.start()
+
+        csv_columns = [str(col) for col in self.tabela.columns] if self.tabela is not None else []
+        self.overlay.set_csv_columns(csv_columns)
+        self.overlay.set_placeholder_status("Tip: click target field, then add placeholder")
 
         self.overlay.show()
         self.overlay.raise_()
@@ -714,9 +894,63 @@ class ActionRecorder(QMainWindow):
         self.print_terminal(self.translate('Recording... Press "Stop" to finish.'))
         self.apply_mark_state("recording")
 
+    def toggle_move_target_mode(self):
+        if not self.recording:
+            self.print_terminal("Inicie a gravacao para mover o target.")
+            return
+        if self.last_record_click_position is None:
+            self.print_terminal("Defina um target com clique antes de mover.")
+            return
+
+        if not self.move_target_mode:
+            self.move_target_mode = True
+            self.was_paused_before_move = self.record_paused
+            self.record_paused = True
+            x, y = self.last_record_click_position
+            self.target_marker_overlay.show_at(int(x), int(y), QColor("#ff9a6b"))
+            self.overlay.set_placeholder_status("Move Target ativo: mova/click no texto; clique Move Target novamente para finalizar")
+            self.print_terminal("Modo mover target ativo. Gravacao pausada automaticamente.")
+        else:
+            self.move_target_mode = False
+            self.record_paused = self.was_paused_before_move
+            self.target_marker_overlay.hide_marker()
+            self.overlay.set_placeholder_status("Move Target finalizado")
+            self.print_terminal("Modo mover target finalizado.")
+
+    def add_csv_placeholder_action(self, column_name: str):
+        if not self.recording:
+            self.print_terminal("Inicie a gravacao para inserir placeholder CSV.")
+            return
+        if self.record_paused:
+            self.print_terminal("Retome a gravacao antes de inserir placeholder CSV.")
+            return
+        if self.tabela is None:
+            self.print_terminal("Importe um CSV antes de inserir placeholder.")
+            return
+
+        valid_columns = [str(col) for col in self.tabela.columns]
+        if column_name not in valid_columns:
+            self.print_terminal(f"Coluna CSV '{column_name}' nao encontrada.")
+            return
+
+        if self.last_record_click_position is None:
+            self.print_terminal("Clique no campo de destino antes de adicionar o placeholder CSV.")
+            self.overlay.set_placeholder_status("Click a target field first")
+            return
+
+        self.current_actions.append(Action("csv_placeholder", column_name))
+        self.overlay.set_placeholder_status(f"Placeholder added: {column_name}")
+        self.print_terminal(f"Placeholder CSV adicionado: {column_name}")
+        x, y = self.last_record_click_position
+        self.placeholder_pulse_overlay.flash(int(x), int(y), QColor("#7df0b3"))
+        self.update_preview_signal.emit()
+
     def pause_resume_record(self):
         if not self.recording:
             self.print_terminal("Nenhuma gravacao ativa.")
+            return
+        if self.move_target_mode:
+            self.print_terminal("Finalize o modo Move Target antes de pausar/retomar.")
             return
         self.record_paused = not self.record_paused
         self.print_terminal("Gravacao pausada." if self.record_paused else "Gravacao retomada.")
@@ -734,6 +968,9 @@ class ActionRecorder(QMainWindow):
 
         self.recording = False
         self.record_paused = False
+        self.last_record_click_position = None
+        self.move_target_mode = False
+        self.target_marker_overlay.hide_marker()
 
         if self.mouse_listener is not None:
             self.mouse_listener.stop()
@@ -760,12 +997,47 @@ class ActionRecorder(QMainWindow):
         self.apply_mark_state("idle")
 
     def on_click(self, x, y, button, pressed):
+        global_point = QPoint(int(x), int(y))
+
+        def clicked_on_control_ui() -> bool:
+            if self.overlay.isVisible() and self.overlay.frameGeometry().contains(global_point):
+                return True
+            if self.isVisible() and not self.isMinimized() and self.frameGeometry().contains(global_point):
+                return True
+            return False
+
         if not self.recording or self.record_paused or not pressed:
+            if self.recording and self.move_target_mode and pressed:
+                if clicked_on_control_ui():
+                    return
+
+                self.last_record_click_position = (x, y)
+                self.target_marker_overlay.show_at(int(x), int(y), QColor("#7df0b3"))
+                self.placeholder_pulse_overlay.flash(int(x), int(y), QColor("#7df0b3"))
+                self.overlay.set_placeholder_status(f"Target preview: ({int(x)}, {int(y)})")
+                self.print_terminal(f"Target atualizado para ({int(x)}, {int(y)}) em modo mover.")
             return
-        if self.geometry().contains(self.mapFromGlobal(QPoint(x, y))):
+
+        if clicked_on_control_ui():
             return
+
         self.current_actions.append(Action("click", (x, y)))
+        self.last_record_click_position = (x, y)
+        self.overlay.set_placeholder_status(f"Target selected: ({int(x)}, {int(y)})")
+        self.placeholder_pulse_overlay.flash(int(x), int(y), QColor("#ff6b6b"))
         self.update_preview_signal.emit()
+
+    def on_move(self, x, y):
+        if not self.recording or not self.move_target_mode:
+            return
+
+        now = time.time()
+        if now - self.last_move_preview_ts < 0.016:
+            return
+        self.last_move_preview_ts = now
+
+        self.last_record_click_position = (x, y)
+        self.target_marker_overlay.show_at(int(x), int(y), QColor("#ff9a6b"))
 
     def on_scroll(self, x, y, dx, dy):
         if not self.recording or self.record_paused:
@@ -817,31 +1089,74 @@ class ActionRecorder(QMainWindow):
 
     def replay(self, nodes_to_replay: List[Node]):
         self.print_terminal("Reproducao iniciada.")
-        for node in nodes_to_replay:
+        repetition_count = self.repetition_lineedit.text().strip()
+        total_iterations = int(repetition_count) if repetition_count.isdigit() and int(repetition_count) > 0 else 1
+
+        has_csv_placeholders = any(
+            action.action_type == "csv_placeholder"
+            for node in nodes_to_replay
+            for action in node.actions
+        )
+
+        if has_csv_placeholders:
+            if self.tabela is None:
+                self.print_terminal("Importe um CSV para executar placeholders.")
+                self.replaying = False
+                self.replay_paused = False
+                self.apply_mark_state("idle")
+                return
+            if len(self.tabela.index) == 0:
+                self.print_terminal("CSV sem linhas para preencher placeholders.")
+                self.replaying = False
+                self.replay_paused = False
+                self.apply_mark_state("idle")
+                return
+            total_iterations = min(total_iterations, len(self.tabela.index))
+
+        for iteration_index in range(total_iterations):
             if self.stop_replay_event.is_set():
                 break
-            self.print_terminal(f"Executando {node.name}...")
-            for action in node.actions:
+
+            row_data = self.tabela.iloc[iteration_index] if has_csv_placeholders and self.tabela is not None else None
+            self.print_terminal(f"Iteracao {iteration_index + 1}/{total_iterations}")
+
+            for node in nodes_to_replay:
                 if self.stop_replay_event.is_set():
                     break
-                while self.replay_paused and not self.stop_replay_event.is_set():
-                    time.sleep(0.1)
+                self.print_terminal(f"Executando {node.name}...")
 
-                try:
-                    if action.action_type == "click":
-                        pyautogui.click(*action.value)
-                    elif action.action_type == "press":
-                        pyautogui.press(action.value)
-                    elif action.action_type == "hotkey":
-                        pyautogui.hotkey(action.value)
-                    elif action.action_type == "scroll":
-                        dy = action.value[1]
-                        pyautogui.scroll(int(dy * 120))
-                    time.sleep(self.time_sleep_value)
-                except Exception as exc:
-                    self.print_terminal(f"Erro durante replay: {exc}")
-                    self.stop_replay_event.set()
-                    break
+                for action in node.actions:
+                    if self.stop_replay_event.is_set():
+                        break
+                    while self.replay_paused and not self.stop_replay_event.is_set():
+                        time.sleep(0.1)
+
+                    try:
+                        if action.action_type == "click":
+                            pyautogui.click(*action.value)
+                        elif action.action_type == "press":
+                            pyautogui.press(action.value)
+                        elif action.action_type == "hotkey":
+                            pyautogui.hotkey(action.value)
+                        elif action.action_type == "scroll":
+                            dy = action.value[1]
+                            pyautogui.scroll(int(dy * 120))
+                        elif action.action_type == "csv_placeholder":
+                            if row_data is None:
+                                raise ValueError("Sem linha CSV ativa para placeholder")
+                            column_name = str(action.value)
+                            if column_name not in row_data.index:
+                                raise ValueError(f"Coluna '{column_name}' nao encontrada no CSV")
+                            text_value = str(row_data[column_name])
+                            pyautogui.write(text_value, interval=0.01)
+                            self.print_terminal(
+                                f"CSV -> {column_name} = '{text_value}' (iteracao {iteration_index + 1})"
+                            )
+                        time.sleep(self.time_sleep_value)
+                    except Exception as exc:
+                        self.print_terminal(f"Erro durante replay: {exc}")
+                        self.stop_replay_event.set()
+                        break
 
         self.replaying = False
         self.replay_paused = False
@@ -877,6 +1192,7 @@ class ActionRecorder(QMainWindow):
 
             self.csv_fields_combobox.clear()
             self.csv_fields_combobox.addItems(columns)
+            self.overlay.set_csv_columns(columns)
 
             self.print_terminal(self.translate("CSV file imported successfully."))
         except Exception as exc:
@@ -914,8 +1230,13 @@ class ActionRecorder(QMainWindow):
 
         self.tabela = None
         self.csv_filename = None
+        self.last_record_click_position = None
+        self.move_target_mode = False
         self.headers_combobox.clear()
         self.csv_fields_combobox.clear()
+        self.overlay.set_csv_columns([])
+        self.overlay.set_placeholder_status("Tip: click target field, then add placeholder")
+        self.target_marker_overlay.hide_marker()
 
         self.node_list.clear()
         self.code_preview.blockSignals(True)
@@ -944,6 +1265,13 @@ class ActionRecorder(QMainWindow):
             if not isinstance(value, tuple) or len(value) != 2:
                 raise ValueError("scroll deve ser uma tupla (dx, dy)")
             return Action("scroll", (int(value[0]), int(value[1])))
+
+        if action_type == "csv_placeholder":
+            if raw_value.startswith(("'", '"')):
+                raw_value = str(ast.literal_eval(raw_value))
+            if not raw_value:
+                raise ValueError("csv_placeholder sem coluna")
+            return Action("csv_placeholder", raw_value)
 
         if action_type in ["press", "hotkey"]:
             if raw_value.startswith(("'", '"')):
@@ -998,6 +1326,11 @@ class ActionRecorder(QMainWindow):
                 lines.append(f"    pyautogui.hotkey('{action.value}')")
             elif action.action_type == "scroll":
                 lines.append(f"    pyautogui.scroll({int(action.value[1] * 120)})")
+            elif action.action_type == "csv_placeholder":
+                if self.csv_filename:
+                    lines.append(f"    pyautogui.write(str(_['{action.value}']))")
+                else:
+                    lines.append("    pyautogui.write('')")
             lines.append(f"    time.sleep({delay})")
 
         with open(filename, "w", encoding="utf-8") as file:
