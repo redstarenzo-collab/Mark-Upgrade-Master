@@ -64,25 +64,27 @@ Modelo recomendado:
 ## Fase 1 - Core do MVP (3-5 dias)
 **Meta:** fluxo principal funcionando de ponta a ponta.
 
+**Status:** Concluida em 2026-03-10 13:41:59
+
 ### Tarefas
-- Implementar gravacao robusta:
-  - click, press e scroll
-  - start/pause/stop confiaveis
-- Ajustar lista para mostrar **Nodes** e nao acoes individuais.
-- Corrigir replay com controle de pausa/retomada/parada.
-- Corrigir `Clear` para limpar:
-  - nodes
-  - preview
-  - terminal
-  - undo/redo
-  - estado temporario de gravacao
-- Corrigir importacao CSV e binding de header/colunas.
-- Ligar `time_sleep_selector` ao valor real de delay.
+- [x] Implementar gravacao robusta:
+  - [x] click, press e scroll
+  - [x] start/pause/stop confiaveis
+- [x] Ajustar lista para mostrar **Nodes** e nao acoes individuais.
+- [x] Corrigir replay com controle de pausa/retomada/parada.
+- [x] Corrigir `Clear` para limpar:
+  - [x] nodes
+  - [x] preview
+  - [x] terminal
+  - [x] undo/redo
+  - [x] estado temporario de gravacao
+- [x] Corrigir importacao CSV e binding de header/colunas.
+- [x] Ligar `time_sleep_selector` ao valor real de delay.
 
 ### Entregaveis
-- Gravacao e execucao basica estaveis.
-- CSV importado sem sobreposicao de headers.
-- Clear completo funcionando.
+- [x] Gravacao e execucao basica estaveis.
+- [x] CSV importado sem sobreposicao de headers.
+- [x] Clear completo funcionando.
 
 ### Criterio de pronto
 - Usuario consegue gravar um Node, reproduzir e limpar tudo sem reiniciar app.
@@ -90,15 +92,17 @@ Modelo recomendado:
 ## Fase 2 - Persistencia e Edicao (2-4 dias)
 **Meta:** tornar o app pratico para uso diario.
 
+**Status:** Concluida tecnicamente em 2026-03-10 13:52:51 (validacao manual de fluxo GUI pendente)
+
 ### Tarefas
-- Salvar/carregar projeto (`.json`).
-- Melhorar edicao de acoes no preview com parser resiliente.
-- Corrigir undo/redo real (com stack consistente).
-- Melhorar tratamento de erro e mensagens no terminal.
+- [x] Salvar/carregar projeto (`.json`).
+- [x] Melhorar edicao de acoes no preview com parser resiliente.
+- [x] Corrigir undo/redo real (com stack consistente).
+- [x] Melhorar tratamento de erro e mensagens no terminal.
 
 ### Entregaveis
-- Projeto pode ser fechado e retomado sem perda de fluxo.
-- Edicao de acoes nao quebra facilmente.
+- [x] Projeto pode ser fechado e retomado sem perda de fluxo.
+- [x] Edicao de acoes nao quebra facilmente.
 
 ### Criterio de pronto
 - Fluxo de criar, salvar, reabrir e executar automacao funciona sem regressao.
@@ -106,16 +110,18 @@ Modelo recomendado:
 ## Fase 3 - UX e Identidade Visual (3-5 dias)
 **Meta:** elevar percepcao de produto e clareza de estados.
 
+**Status:** Em andamento (inicio em 2026-03-10 13:58:28)
+
 ### Tarefas
-- Intro de abertura com personagem Mark.
-- Indicador visual de estado (executando, pausado, editando).
-- Cubo holografico no canto inferior direito:
-  - gira durante gravacao
-  - para quando pausado
-  - sem fundo e menor tamanho
-- Inserir logo na interface.
-- Melhorar dark mode (incluindo barras de rolagem escuras).
-- Completar traducao (menus superiores, secoes e mensagens faltantes).
+- [x] Intro de abertura com personagem Mark.
+- [x] Indicador visual de estado (executando, pausado, editando).
+- [x] Cubo holografico no canto inferior direito:
+  - [x] gira durante gravacao
+  - [x] para quando pausado
+  - [x] sem fundo e menor tamanho
+- [x] Inserir logo na interface (identidade MARK no header).
+- [x] Melhorar dark mode (incluindo barras de rolagem escuras).
+- [ ] Completar traducao (menus superiores, secoes e mensagens faltantes).
 
 ### Entregaveis
 - UI com feedback visual de status.
@@ -150,16 +156,16 @@ Modelo recomendado:
 ## 5) Backlog Priorizado (Now / Next / Later)
 
 ### Now (MVP imediato)
-- [ ] Modelo real de Node
-- [ ] Gravacao com scroll
-- [ ] Replay confiavel com pausa/parada
-- [ ] CSV/header corrigido
-- [ ] Clear total
-- [ ] Persistencia JSON
+- [x] Modelo real de Node
+- [x] Gravacao com scroll
+- [x] Replay confiavel com pausa/parada
+- [x] CSV/header corrigido
+- [x] Clear total
+- [x] Persistencia JSON
 
 ### Next
-- [ ] Undo/redo robusto
-- [ ] Parser de preview resiliente
+- [x] Undo/redo robusto
+- [x] Parser de preview resiliente
 - [ ] Traducao completa
 - [ ] Correcao dark mode (scrollbars)
 
@@ -228,5 +234,10 @@ O MVP sera considerado pronto quando:
 - Consegue limpar tudo e reiniciar fluxo dentro da mesma sessao.
 - Consegue salvar e reabrir o projeto mantendo os Nodes.
 
+## 10) Log de Execucao
+- 2026-03-10 13:41:59 - Fase 1 concluida (gravacao click/press/scroll, replay com pausa/parada, clear completo, CSV/header corrigido, delay conectado ao seletor).
+- 2026-03-10 13:52:51 - Fase 2 concluida tecnicamente (salvar/carregar JSON, parser resiliente no preview, undo/redo com snapshot consistente, mensagens de erro aprimoradas).
+- 2026-03-10 13:58:28 - Fase 3 iniciada com identidade visual MARK (intro, status chip, painel de sinal, cubo holografico animado, tema dark/light refinado).
+
 ---
-Ultima atualizacao: 2026-03-10
+Ultima atualizacao: 2026-03-10 13:58:28
